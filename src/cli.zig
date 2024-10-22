@@ -194,10 +194,11 @@ pub const Arguments = struct {
     };
 
     const transpiler_params_ = [_]ParamType{
-        clap.parseParam("--main-fields <STR>...            Main fields to lookup in package.json. Defaults to --target dependent") catch unreachable,
+        clap.parseParam("--main-fields <STR>...             Main fields to lookup in package.json. Defaults to --target dependent") catch unreachable,
         clap.parseParam("--extension-order <STR>...        Defaults to: .tsx,.ts,.jsx,.js,.json ") catch unreachable,
-        clap.parseParam("--tsconfig-override <STR>         Specify custom tsconfig.json. Default <d>$cwd<r>/tsconfig.json") catch unreachable,
-        clap.parseParam("-d, --define <STR>...             Substitute K:V while parsing, e.g. --define process.env.NODE_ENV:\"development\". Values are parsed as JSON.") catch unreachable,
+        clap.parseParam("--tsconfig-override <STR>          Specify custom tsconfig.json. Default <d>$cwd<r>/tsconfig.json") catch unreachable,
+        clap.parseParam("-d, --define <STR>...              Substitute K:V while parsing, e.g. --define process.env.NODE_ENV:\"development\". Values are parsed as JSON.") catch unreachable,
+        clap.parseParam("--drop <STR>...                   Remove function calls, e.g. --drop=console removes all console.* calls.") catch unreachable,
         clap.parseParam("-l, --loader <STR>...             Parse files with .ext:loader, e.g. --loader .js:jsx. Valid loaders: js, jsx, ts, tsx, json, toml, text, file, wasm, napi") catch unreachable,
         clap.parseParam("--no-macros                       Disable macros from being executed in the bundler, transpiler and runtime") catch unreachable,
         clap.parseParam("--jsx-factory <STR>               Changes the function called when compiling JSX elements using the classic JSX runtime") catch unreachable,
@@ -262,6 +263,8 @@ pub const Arguments = struct {
         clap.parseParam("--outdir <STR>                   Default to \"dist\" if multiple files") catch unreachable,
         clap.parseParam("--outfile <STR>                  Write to a file") catch unreachable,
         clap.parseParam("--sourcemap <STR>?               Build with sourcemaps - 'linked', 'inline', 'external', or 'none'") catch unreachable,
+        clap.parseParam("--banner <STR>                   Add a banner to the bundled output such as \"use client\"; for a bundle being used with RSCs") catch unreachable,
+        clap.parseParam("--footer <STR>                   Add a footer to the bundled output such as // built with bun!") catch unreachable,
         clap.parseParam("--format <STR>                   Specifies the module format to build to. Only \"esm\" is supported.") catch unreachable,
         clap.parseParam("--root <STR>                     Root directory used for multiple entry points") catch unreachable,
         clap.parseParam("--splitting                      Enable code splitting") catch unreachable,
@@ -588,6 +591,8 @@ pub const Arguments = struct {
             };
         }
 
+        opts.drop = args.options("--drop");
+
         const loader_tuple = try LoaderColonList.resolve(allocator, args.options("--loader"));
 
         if (loader_tuple.keys.len > 0) {
@@ -776,6 +781,14 @@ pub const Arguments = struct {
 
             if (args.option("--public-path")) |public_path| {
                 ctx.bundler_options.public_path = public_path;
+            }
+
+            if (args.option("--banner")) |banner| {
+                ctx.bundler_options.banner = banner;
+            }
+
+            if (args.option("--footer")) |footer| {
+                ctx.bundler_options.footer = footer;
             }
 
             const experimental_css = args.flag("--experimental-css");
@@ -1294,6 +1307,10 @@ pub var is_bunx_exe = false;
 pub const Command = struct {
     var script_name_buf: bun.PathBuffer = undefined;
 
+    pub fn get() Context {
+        return global_cli_ctx;
+    }
+
     pub const DebugOptions = struct {
         dump_environment_variables: bool = false,
         dump_limits: bool = false,
@@ -1402,6 +1419,8 @@ pub const Command = struct {
             emit_dce_annotations: bool = true,
             output_format: options.Format = .esm,
             bytecode: bool = false,
+            banner: []const u8 = "",
+            footer: []const u8 = "",
             experimental_css: bool = false,
         };
 
